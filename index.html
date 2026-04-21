@@ -259,6 +259,7 @@ body{font-family:'IBM Plex Sans Arabic',sans-serif;background:var(--gray-50);col
     <button class="nav-btn" onclick="showPage('records',this)">السجلات</button>
     <button class="nav-btn" onclick="showPage('analysis',this)">التحليل</button>
   </nav>
+  <button onclick="loadFromCloud()" style="margin-right:8px;padding:6px 12px;background:transparent;border:1px solid rgba(200,160,90,0.5);border-radius:7px;color:#C8A05A;font-size:12px;font-family:inherit;cursor:pointer;" title="تحديث البيانات من السحابة">↻ تحديث</button>
 </header>
 
 <!-- ═══ ADMIN ═══ -->
@@ -282,9 +283,19 @@ body{font-family:'IBM Plex Sans Arabic',sans-serif;background:var(--gray-50);col
       <div class="field"><label>العمر التقديري</label><input id="c-age" placeholder="مثال: 35"></div>
       <div class="field"><label>الجنسية</label><input id="c-nat" placeholder="سعودي"></div>
     </div>
-    <div class="form-grid" style="margin-bottom:16px;">
+    <div class="form-grid" style="margin-bottom:12px;">
       <div class="field"><label>مصدر الترشيح</label><input id="c-src" placeholder="مثال: استقطاب / إحالة"></div>
       <div class="field"><label>تقييم السيرة الذاتية (%)</label><input id="c-cv" type="number" min="0" max="100" placeholder="78"></div>
+    </div>
+    <div class="form-grid full" style="margin-bottom:16px;">
+      <div class="field">
+        <label>رابط السيرة الذاتية</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input id="c-cvlink" placeholder="مثال: https://drive.google.com/... أو أي رابط مشترك" style="flex:1;">
+          <a id="c-cvlink-preview" href="#" target="_blank" style="display:none;padding:9px 14px;background:var(--navy);color:#fff;border-radius:8px;font-size:12px;text-decoration:none;white-space:nowrap;flex-shrink:0;">فتح ↗</a>
+        </div>
+        <div style="font-size:11px;color:var(--gray-400);margin-top:5px;">ضع رابط Google Drive أو Dropbox أو أي رابط مشترك للسيرة الذاتية</div>
+      </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
       <button class="btn btn-primary" onclick="addCandidate()">إضافة المرشح</button>
@@ -460,12 +471,13 @@ function showSyncBadge(msg,color){
 function hideSyncBadge(delay=2000){setTimeout(()=>{const el=document.getElementById('sync-badge');if(el)el.style.opacity='0';},delay);}
 
 async function loadFromCloud(){
-  showSyncBadge('⟳  جاري تحميل البيانات من السحابة...','#C8A05A');
+  showSyncBadge('⟳  جاري تحميل البيانات...','#C8A05A');
   try{
     const res=await fetch('https://api.jsonbin.io/v3/b/'+BIN_ID+'/latest',{
-      headers:{'X-Master-Key':BIN_KEY,'X-Bin-Meta':'false'}
+      method:'GET',
+      headers:{'X-Master-Key':BIN_KEY}
     });
-    if(!res.ok) throw new Error(res.status);
+    if(!res.ok){const txt=await res.text();throw new Error(res.status+': '+txt);}
     const json=await res.json();
     const data=json.record||json;
     if(Array.isArray(data.candidates)) state.candidates=data.candidates;
@@ -475,8 +487,8 @@ async function loadFromCloud(){
     showSyncBadge('✓  البيانات محدّثة','#1e6b3a');
     hideSyncBadge(2500);
   }catch(e){
-    showSyncBadge('⚠  تعذّر الاتصال بالسحابة','#c0392b');
-    hideSyncBadge(3500);
+    showSyncBadge('⚠  '+e.message,'#c0392b');
+    hideSyncBadge(6000);
     console.error('Cloud load error:',e);
   }
 }
@@ -490,12 +502,12 @@ async function saveToCloud(){
       headers:{'Content-Type':'application/json','X-Master-Key':BIN_KEY},
       body:JSON.stringify(payload)
     });
-    if(!res.ok) throw new Error(res.status);
+    if(!res.ok){const txt=await res.text();throw new Error(res.status+': '+txt);}
     showSyncBadge('✓  تم الحفظ بنجاح','#1e6b3a');
     hideSyncBadge(2500);
   }catch(e){
-    showSyncBadge('⚠  فشل الحفظ — تحقق من الاتصال','#c0392b');
-    hideSyncBadge(4000);
+    showSyncBadge('⚠  '+e.message,'#c0392b');
+    hideSyncBadge(6000);
     console.error('Cloud save error:',e);
   }
 }
@@ -516,15 +528,21 @@ function addCandidate(){
   const name=document.getElementById('c-name').value.trim();
   const job=document.getElementById('c-job').value.trim();
   if(!name||!job){toast('أدخل اسم المرشح والوظيفة');return;}
-  state.candidates.push({id:Date.now(),name,job,exp:document.getElementById('c-exp').value,age:document.getElementById('c-age').value,nat:document.getElementById('c-nat').value,src:document.getElementById('c-src').value,cv:document.getElementById('c-cv').value||'—'});
-  ['c-name','c-job','c-exp','c-age','c-nat','c-src','c-cv'].forEach(id=>document.getElementById(id).value='');
+  const cvlinkEl=document.getElementById('c-cvlink');
+  state.candidates.push({id:Date.now(),name,job,exp:document.getElementById('c-exp').value,age:document.getElementById('c-age').value,nat:document.getElementById('c-nat').value,src:document.getElementById('c-src').value,cv:document.getElementById('c-cv').value||'—',cvlink:cvlinkEl?cvlinkEl.value.trim():''});
+  ['c-name','c-job','c-exp','c-age','c-nat','c-src','c-cv','c-cvlink'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   renderCandidates();saveToCloud();toast('تمت إضافة المرشح ✓');
 }
 function removeCandidate(id){state.candidates=state.candidates.filter(c=>c.id!==id);renderCandidates();saveToCloud();}
 function renderCandidates(){
   const el=document.getElementById('candidates-list');
   if(!state.candidates.length){el.innerHTML='<div style="font-size:12px;color:var(--gray-400);">لا يوجد مرشحون بعد</div>';return;}
-  el.innerHTML=state.candidates.map(c=>`<span class="tag tag-navy">${c.name} — ${c.job}<button class="tag-remove" onclick="removeCandidate(${c.id})">×</button></span>`).join('');
+  el.innerHTML=state.candidates.map(c=>`
+    <div style="display:inline-flex;align-items:center;gap:0;background:#eef1fb;border-radius:8px;margin:3px;overflow:hidden;">
+      <span style="padding:5px 10px;font-size:12px;font-weight:500;color:var(--navy);">${c.name} — ${c.job}</span>
+      ${c.cvlink?`<a href="${c.cvlink}" target="_blank" style="padding:5px 10px;background:var(--navy);color:#C8A05A;font-size:11px;text-decoration:none;font-weight:500;">السيرة ↗</a>`:''}
+      <button class="tag-remove" onclick="removeCandidate(${c.id})" style="padding:5px 10px;color:var(--navy);font-size:14px;background:rgba(26,42,94,0.08);">×</button>
+    </div>`).join('');
 }
 
 // ── EVALUATORS
@@ -568,7 +586,10 @@ function onCandidateSelect(){
     document.getElementById('cand-avatar').textContent=cand.name.charAt(0);
     document.getElementById('cand-bar-name').textContent=cand.name;
     document.getElementById('cand-bar-sub').textContent=`${cand.job}${cand.exp?' | '+cand.exp:''}${cand.nat?' | '+cand.nat:''}`;
-    document.getElementById('cand-bar-cv').textContent=`السيرة الذاتية: ${cand.cv}%`;
+    const cvBadge=document.getElementById('cand-bar-cv');
+    cvBadge.innerHTML=cand.cvlink
+      ? `<a href="${cand.cvlink}" target="_blank" style="color:var(--navy-dark);text-decoration:none;">السيرة: ${cand.cv}%  ↗</a>`
+      : `السيرة الذاتية: ${cand.cv}%`;
   }else{bar.style.display='none';}
   checkReady();
 }
