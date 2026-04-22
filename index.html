@@ -436,10 +436,8 @@ const {jsPDF}=window.jspdf;
 const GENERAL=['المظهر','السلوك','التعبير عن الذات','النضج','الحكم واتخاذ القرار','مهارات التواصل','إجادة اللغة الإنجليزية','حل المشكلات','العمل تحت الضغط','تحمل المسؤولية','الإيجابية والمبادرة','قابلية التطور المهني','الخبرة المهنية','خبرة النشاط','الاستقرار في العمل','الإنجازات المهنية والشخصية','المهارات التقنية','المهارات الشخصية','القدرات الذهنية','التقييم النفسي'];
 const SPECIAL=['تقييم وتحليل الموقف القضائي وتحديد الاستراتيجية','إتقان صياغة المذكرات القانونية','سابق الخبرة في دور مهني مماثل للمنصب','توزيع القضايا والمهام على الفريق','إدارة الاجتماعات الدورية وضبط الجدول الزمني','التناسب الثقافي للمنشأة','الرقابة على المواعيد والإجراءات القضائية','التعامل مع كبار العملاء واحتواء طلباتهم','متابعة أعمال الفريق والتأكد من الالتزام','إعداد التقارير الدورية (عملاء / الإدارة التنفيذية)','تقييم الدعاوى الجديدة قبل التعاقد','إدارة المعرفة والتدريب ونقل الخبرة','المعرفة بالأنظمة والأدوات التقنية','متابعة مستجدات والتحديثات القانونية'];
 
-// ═══ JSONBin Config ═══
-const BIN_ID='69e7b13eaaba88219722458a';
-const BIN_KEY='$2a$10$K9B0dpOrR5X0VhwFUzATQuq33AXxbuldCQytiXH7cIeTBoRCuKjX.';
-const BIN_URL=`https://api.jsonbin.io/v3/b/${BIN_ID}`;
+// ═══ Firebase Config ═══
+const FB_URL='https://alzoriqy-eval-default-rtdb.firebaseio.com';
 
 let state={
   candidates:[],
@@ -473,23 +471,21 @@ function hideSyncBadge(delay=2000){setTimeout(()=>{const el=document.getElementB
 async function loadFromCloud(){
   showSyncBadge('⟳  جاري تحميل البيانات...','#C8A05A');
   try{
-    const res=await fetch('https://api.jsonbin.io/v3/b/'+BIN_ID+'/latest',{
-      method:'GET',
-      headers:{'X-Master-Key':BIN_KEY}
-    });
-    if(!res.ok){const txt=await res.text();throw new Error(res.status+': '+txt);}
-    const json=await res.json();
-    const data=json.record||json;
-    if(Array.isArray(data.candidates)) state.candidates=data.candidates;
-    if(Array.isArray(data.submissions)) state.submissions=data.submissions;
+    const res=await fetch(FB_URL+'/data.json');
+    if(!res.ok) throw new Error(res.status);
+    const data=await res.json();
+    if(data){
+      if(Array.isArray(data.candidates)) state.candidates=data.candidates;
+      if(Array.isArray(data.submissions)) state.submissions=data.submissions;
+    }
     renderCandidates();
     renderEvaluators();
     showSyncBadge('✓  البيانات محدّثة','#1e6b3a');
     hideSyncBadge(2500);
   }catch(e){
     showSyncBadge('⚠  '+e.message,'#c0392b');
-    hideSyncBadge(6000);
-    console.error('Cloud load error:',e);
+    hideSyncBadge(5000);
+    console.error('Firebase load error:',e);
   }
 }
 
@@ -497,18 +493,18 @@ async function saveToCloud(){
   showSyncBadge('⟳  جاري الحفظ في السحابة...','#C8A05A');
   try{
     const payload={candidates:state.candidates,submissions:state.submissions};
-    const res=await fetch('https://api.jsonbin.io/v3/b/'+BIN_ID,{
+    const res=await fetch(FB_URL+'/data.json',{
       method:'PUT',
-      headers:{'Content-Type':'application/json','X-Master-Key':BIN_KEY},
+      headers:{'Content-Type':'application/json'},
       body:JSON.stringify(payload)
     });
-    if(!res.ok){const txt=await res.text();throw new Error(res.status+': '+txt);}
+    if(!res.ok) throw new Error(res.status);
     showSyncBadge('✓  تم الحفظ بنجاح','#1e6b3a');
     hideSyncBadge(2500);
   }catch(e){
     showSyncBadge('⚠  '+e.message,'#c0392b');
-    hideSyncBadge(6000);
-    console.error('Cloud save error:',e);
+    hideSyncBadge(5000);
+    console.error('Firebase save error:',e);
   }
 }
 
